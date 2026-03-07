@@ -15,15 +15,12 @@ def registro():
         username = request.form.get('username')
         password = request.form.get('password')
         rol = request.form.get('rol')
-        
         nombre = request.form.get('nombre')
         c_i = request.form.get('c_i')
         celular = request.form.get('celular')
-        
         if User.query.filter_by(username=username).first():
             flash('El nombre de usuario ya está en uso.', 'danger')
             return redirect(url_for('auth.registro'))
-            
         if Lector.query.filter_by(C_I=c_i).first():
             flash('Esta Cédula de Identidad ya está registrada.', 'danger')
             return redirect(url_for('auth.registro'))
@@ -36,16 +33,14 @@ def registro():
         db.session.commit()
         flash(f'Lector "{nombre}" registrado exitosamente en el sistema.', 'success')
         return redirect(url_for('auth.lista_usuarios'))
-        
     return render_template('registro.html')
+
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        
         usuario = User.query.filter_by(username=username).first()
-        
         if usuario and usuario.check_password(password):
             login_user(usuario)
             return redirect(url_for('auth.lista_usuarios'))
