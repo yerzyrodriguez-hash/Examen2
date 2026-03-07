@@ -6,4 +6,4 @@ db = SQLAlchemy()
 login_manager = LoginManager()
 migrate = Migrate()
 
-login_manager.login_view = "usuarios.login"
+login_manager.login_view = "auth.login"
