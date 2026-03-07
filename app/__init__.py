@@ -15,8 +15,12 @@ def create_app():
     
     from .models import User, Lector
     
+    from .auth import auth_bp
+    app.register_blueprint(auth_bp)
+    
     @app.route('/')
-    def inicio():
-        return "¡El Sistema de Biblioteca está funcionando!"
+    def index():
+        from flask import redirect, url_for
+        return redirect(url_for('auth.login'))
         
     return app
