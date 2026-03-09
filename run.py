@@ -6,6 +6,8 @@ app = create_app()
 
 if __name__ == "__main__":
     with app.app_context():
+        db.create_all()
+        
         if not User.query.filter_by(username="admin").first():
             admin_user = User(username="admin", role="admin")
             admin_user.set_password("1234")
@@ -15,5 +17,5 @@ if __name__ == "__main__":
             db.session.add(admin_perfil)
             db.session.commit()
             print("✅ Primer administrador creado (Usuario: admin | Contraseña: 1234)")
-            
+
     app.run(debug=True)

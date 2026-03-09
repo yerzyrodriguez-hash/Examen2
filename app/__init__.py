@@ -18,6 +18,9 @@ def create_app():
     from .auth import auth_bp
     app.register_blueprint(auth_bp)
     
+    from .inventario import inventario_bp
+    app.register_blueprint(inventario_bp)
+    
     @app.route('/')
     def index():
         from flask import redirect, url_for

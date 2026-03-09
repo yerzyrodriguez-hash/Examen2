@@ -67,3 +67,16 @@ def lista_usuarios():
     else:
         usuarios = User.query.all()
     return render_template('lista_usuarios.html', usuarios=usuarios, busqueda=busqueda)
+
+@auth_bp.route('/eliminar/<int:id>')
+@login_required
+def eliminar_usuario(id):
+    usuario = User.query.get_or_404(id)
+    if usuario.username == 'admin':
+        flash('Por seguridad, no puedes eliminar al administrador principal.', 'danger')
+        return redirect(url_for('auth.lista_usuarios'))
+    db.session.delete(usuario.perfil)
+    db.session.delete(usuario)
+    db.session.commit()
+    flash('El usuario y su perfil han sido eliminados del sistema.', 'success')
+    return redirect(url_for('auth.lista_usuarios'))
