@@ -1,6 +1,7 @@
 from flask_login import UserMixin
 from .extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
 
 class User(db.Model, UserMixin):
     __tablename__ = 'usuarios'
@@ -42,5 +43,30 @@ class Libro(db.Model):
     stock = db.Column(db.Integer, nullable=False, default=0)
     categoria_id = db.Column(db.Integer, db.ForeignKey('categorias.id'), nullable=False)
     
+    @property
+    def disponible(self):
+        prestamos_pendientes = sum(1 for p in self.prestamos if p.estado == 'Pendiente')
+        return self.stock > prestamos_pendientes
+
     def __repr__(self):
         return f'<Libro {self.titulo}>'
+
+class Prestamo(db.Model):
+    __tablename__ = 'prestamos'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    fecha_prestamo = db.Column(db.DateTime, nullable=False, default=db.func.current_timestamp())
+    fecha_devolucion = db.Column(db.DateTime, nullable=True)
+    estado = db.Column(db.String(50), nullable=False, default='Pendiente')  # "Pendiente" o "Devuelto"
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
+    libro_id = db.Column(db.Integer, db.ForeignKey('libros.id'), nullable=False)
+
+    usuario = db.relationship('User', backref='prestamos', lazy=True)
+    libro = db.relationship('Libro', backref='prestamos', lazy=True)
+    
+    def __repr__(self):
+        return f'<Prestamo {self.id} - {self.estado}>'
+    
+    def devolver(self):
+        self.estado = 'Devuelto'
+        self.fecha_devolucion = datetime.now()
