@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block title %}Préstamos{% endblock %}
+
+{% block content %}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-plus-circle"></i> Registrar Nuevo Préstamo</h4>
+                </div>
+                <div class="card-body">
+                    
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form method="POST" id="formPrestamo">
+                        <div class="mb-3">
+                            <label for="usuario_id" class="form-label">Seleccionar Usuario</label>
+                            <select class="form-select" id="usuario_id" name="usuario_id" required>
+                                <option value="">-- Elige un usuario --</option>
+                                {% for u in usuarios %}
+                                <option value="{{ u.id }}">
+                                    {{ u.perfil.nombre }} (CI: {{ u.perfil.C_I }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="libro_id" class="form-label">Seleccionar Libro</label>
+                            <select class="form-select" id="libro_id" name="libro_id" required>
+                                <option value="">-- Elige un libro --</option>
+                                {% for l in libros %}
+                                <option value="{{ l.id }}" data-disponible="{{ l.disponible }}">
+                                    {{ l.titulo }} - {{ l.autor }} 
+                                    (Stock: {{ l.stock }} | Disponibles: 
+                                    {% set prestados = l.prestamos|selectattr('estado', 'equalto', 'Pendiente')|list %}
+                                    {{ l.stock - prestados|length }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div id="stockInfo" class="form-text"></div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> 
+                            La fecha de préstamo se registrará automáticamente al guardar.
+                        </div>
+
+                        <hr class="my-4">
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg" id="btnSubmit">
+                                <i class="bi bi-check-circle"></i> Registrar Préstamo
+                            </button>
+                            <a href="{{ url_for('auth.lista_prestamos') }}" class="btn btn-outline-secondary">
+                                Cancelar
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Script para validar disponibilidad del libro en tiempo real
+document.getElementById('libro_id').addEventListener('change', function() {
+    const selected = this.options[this.selectedIndex];
+    const disponible = selected.dataset.disponible === 'True';
+    const stockInfo = document.getElementById('stockInfo');
+    const btnSubmit = document.getElementById('btnSubmit');
+    
+    if (selected.value && !disponible) {
+        stockInfo.innerHTML = '<span class="text-danger">⚠️ Este libro no tiene ejemplares disponibles</span>';
+        btnSubmit.disabled = true;
+    } else {
+        stockInfo.innerHTML = '';
+        btnSubmit.disabled = false;
+    }
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}Préstamos{% endblock %}
+
+{% block content %}
+
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="bi bi-arrow-left-right"></i> Préstamos</h2>
+            <a href="{{ url_for('auth.nuevo_prestamo') }}" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Nuevo Préstamo
+            </a>
+        </div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="btn-group" role="group">
+                    <a href="{{ url_for('auth.lista_prestamos') }}" class="btn btn-outline-secondary {% if not request.args.get('estado') %}active{% endif %}">
+                        Todos
+                    </a>
+                    <a href="{{ url_for('auth.lista_prestamos', estado='Pendiente') }}" class="btn btn-outline-warning {% if request.args.get('estado') == 'Pendiente' %}active{% endif %}">
+                        Pendientes
+                    </a>
+                    <a href="{{ url_for('auth.lista_prestamos', estado='Devuelto') }}" class="btn btn-outline-success {% if request.args.get('estado') == 'Devuelto' %}active{% endif %}">
+                        Devueltos
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table table-hover table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Usuario</th>
+                        <th>Libro</th>
+                        <th>Fecha Préstamo</th>
+                        <th>Fecha Devolución</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prestamo in prestamos %}
+                    <tr>
+                        <td>#{{ prestamo.id }}</td>
+                        <td>
+                            <strong>{{ prestamo.usuario.perfil.nombre }}</strong><br>
+                            <small class="text-muted">@{{ prestamo.usuario.username }}</small>
+                        </td>
+                        <td>
+                            <strong>{{ prestamo.libro.titulo }}</strong><br>
+                            <small class="text-muted">{{ prestamo.libro.autor }}</small>
+                        </td>
+                        <td>{{ prestamo.fecha_prestamo.strftime('%d/%m/%Y %H:%M') }}</td>
+                        <td>
+                            {% if prestamo.fecha_devolucion %}
+                                {{ prestamo.fecha_devolucion.strftime('%d/%m/%Y %H:%M') }}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if prestamo.estado == 'Pendiente' %}
+                            <span class="badge bg-warning text-dark">
+                                <i class="bi bi-clock"></i> Pendiente
+                            </span>
+                            {% else %}
+                            <span class="badge bg-success">
+                                <i class="bi bi-check-circle"></i> Devuelto
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if prestamo.estado == 'Pendiente' %}
+                            <a href="{{ url_for('auth.devolver_prestamo', id=prestamo.id) }}" 
+                            class="btn btn-sm btn-success"
+                            onclick="return confirm('¿Confirmar devolución de este libro?')">
+                                <i class="bi bi-arrow-return-left"></i> Devolver
+                            </a>
+                            {% else %}
+                            <button class="btn btn-sm btn-outline-secondary" disabled>
+                                <i class="bi bi-check2"></i> Completado
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="bi bi-emoji-frown fs-1 d-block mb-3"></i>
+                            No hay préstamos registrados
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+{% endblock %}
