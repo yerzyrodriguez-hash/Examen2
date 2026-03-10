@@ -3,6 +3,8 @@ from flask_login import login_user, logout_user, login_required, current_user
 from .models import User, Lector, Libro, Categoria, Prestamo
 from .extensions import db, login_manager
 import pandas as pd
+from openpyxl.styles import Font, Alignment
+from openpyxl.utils import get_column_letter
 from io import BytesIO
 from flask import send_file
 from .inventario import solo_admin
@@ -211,3 +213,254 @@ def devolver_prestamo(id):
         flash('Este préstamo ya fue devuelto anteriormente', 'warning')
     
     return redirect(url_for('auth.lista_prestamos'))
+
+# ============= RUTAS PARA REPORTES DE PRÉSTAMOS =============
+@auth_bp.route('/reportes/prestamos')
+@login_required
+@solo_admin
+def reportes_prestamos():
+    return render_template('reportes_prestamos.html')
+
+@auth_bp.route('/reportes/prestamos/exportar', methods=['POST'])
+@login_required
+@solo_admin
+def exportar_reporte_prestamos():
+    fecha_inicio = request.form.get('fecha_inicio')
+    fecha_fin = request.form.get('fecha_fin')
+    estado = request.form.get('estado')
+    tipo_reporte = request.form.get('tipo_reporte', 'completo')
+
+    query = Prestamo.query
+
+    if fecha_inicio:
+        fecha_inicio_dt = datetime.strptime(fecha_inicio, '%Y-%m-%d')
+        query = query.filter(Prestamo.fecha_prestamo >= fecha_inicio_dt)
+    
+    if fecha_fin:
+        fecha_fin_dt = datetime.strptime(fecha_fin, '%Y-%m-%d')
+        fecha_fin_dt = fecha_fin_dt.replace(hour=23, minute=59, second=59)
+        query = query.filter(Prestamo.fecha_prestamo <= fecha_fin_dt)
+
+    if estado and estado != 'todos':
+        query = query.filter_by(estado=estado)
+
+    prestamos = query.all()
+
+    if tipo_reporte == 'completo':
+        return generar_reporte_completo(prestamos, fecha_inicio, fecha_fin, estado)
+    elif tipo_reporte == 'resumen':
+        return generar_reporte_resumen(prestamos, fecha_inicio, fecha_fin)
+    elif tipo_reporte == 'vencidos':
+        return generar_reporte_vencidos(prestamos)
+    else:
+        return redirect(url_for('auth.reportes_prestamos'))
+
+def generar_reporte_completo(prestamos, fecha_inicio, fecha_fin, estado):
+    """Genera reporte detallado de todos los préstamos"""
+
+    datos = []
+    for p in prestamos:
+        datos.append({
+            'ID Préstamo': p.id,
+            'Fecha Préstamo': p.fecha_prestamo.strftime('%d/%m/%Y %H:%M'),
+            'Fecha Devolución': p.fecha_devolucion.strftime('%d/%m/%Y %H:%M') if p.fecha_devolucion else 'Pendiente',
+            'Estado': p.estado,
+            'Usuario': p.usuario.perfil.nombre,
+            'C.I. Usuario': p.usuario.perfil.C_I,
+            'Celular': p.usuario.perfil.celular or 'Sin registro',
+            'Libro': p.libro.titulo,
+            'Autor': p.libro.autor,
+            'Categoría': p.libro.categoria.nombre if p.libro.categoria else 'Sin categoría',
+        })
+    
+    df = pd.DataFrame(datos)
+    
+    total_prestamos = len(prestamos)
+    prestamos_pendientes = sum(1 for p in prestamos if p.estado == 'Pendiente')
+    prestamos_devueltos = sum(1 for p in prestamos if p.estado == 'Devuelto')
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+
+        df.to_excel(writer, index=False, sheet_name='Préstamos Detallados', startrow=4)
+
+        worksheet = writer.sheets['Préstamos Detallados']
+
+        worksheet.merge_cells('A1:J1')
+        worksheet['A1'] = 'REPORTE PRÉSTAMOS BIBLIOTECA UAB'
+        worksheet['A1'].font = Font(size=16, bold=True)
+        worksheet['A1'].alignment = Alignment(horizontal='center', vertical='center')
+        
+        worksheet.merge_cells('A2:J2')
+        worksheet['A2'] = f'Fecha de generación: {datetime.now().strftime("%d/%m/%Y %H:%M")}'
+        worksheet['A2'].font = Font(size=12, italic=True)
+        worksheet['A2'].alignment = Alignment(horizontal='center', vertical='center')
+        
+        worksheet.merge_cells('A3:J3')
+        periodo = f"Período: {fecha_inicio or 'Inicio'} a {fecha_fin or 'Actualidad'} - Estado: {estado if estado and estado != 'todos' else 'Todos'}"
+        worksheet['A3'] = periodo
+        worksheet['A3'].font = Font(size=11)
+        worksheet['A3'].alignment = Alignment(horizontal='center', vertical='center')
+
+        column_widths = {
+            'A': 12,  # ID Préstamo
+            'B': 20,  # Fecha Préstamo
+            'C': 20,  # Fecha Devolución
+            'D': 15,  # Estado
+            'E': 25,  # Usuario
+            'F': 15,  # C.I. Usuario
+            'G': 15,  # Celular
+            'H': 40,  # Libro
+            'I': 25,  # Autor
+            'J': 20,  # Categoría
+        }
+
+        for col, width in column_widths.items():
+            worksheet.column_dimensions[col].width = width
+        
+        resumen_data = {
+            'Métrica': ['Total Préstamos', 'Préstamos Pendientes', 'Préstamos Devueltos', 
+                       'Fecha Inicio', 'Fecha Fin', 'Filtro Estado'],
+            'Valor': [total_prestamos, prestamos_pendientes, prestamos_devueltos,
+                     fecha_inicio if fecha_inicio else 'Todos', 
+                     fecha_fin if fecha_fin else 'Todos',
+                     estado if estado and estado != 'todos' else 'Todos']
+        }
+        df_resumen = pd.DataFrame(resumen_data)
+        df_resumen.to_excel(writer, index=False, sheet_name='Resumen', startrow=4)
+        
+        worksheet_resumen = writer.sheets['Resumen']
+        
+        worksheet_resumen.merge_cells('A1:B1')
+        worksheet_resumen['A1'] = 'RESUMEN - REPORTE PRÉSTAMOS BIBLIOTECA UAB'
+        worksheet_resumen['A1'].font = Font(size=14, bold=True)
+        worksheet_resumen['A1'].alignment = Alignment(horizontal='center', vertical='center')
+
+        worksheet_resumen.merge_cells('A2:B2')
+        worksheet_resumen['A2'] = f'Fecha de generación: {datetime.now().strftime("%d/%m/%Y %H:%M")}'
+        worksheet_resumen['A2'].font = Font(size=11, italic=True)
+        worksheet_resumen['A2'].alignment = Alignment(horizontal='center', vertical='center')
+        
+        worksheet_resumen.merge_cells('A3:B3')
+        worksheet_resumen['A3'] = periodo
+        worksheet_resumen['A3'].alignment = Alignment(horizontal='center', vertical='center')
+
+        worksheet_resumen.column_dimensions['A'].width = 30
+        worksheet_resumen.column_dimensions['B'].width = 25
+    
+    output.seek(0)
+    
+    fecha_actual = datetime.now().strftime('%Y%m%d_%H%M%S')
+    nombre_archivo = f"Reporte_Prestamos_UAB_{fecha_actual}.xlsx"
+    
+    return send_file(
+        output,
+        download_name=nombre_archivo,
+        as_attachment=True,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+def generar_reporte_resumen(prestamos, fecha_inicio, fecha_fin):
+    """Genera un reporte resumen con estadísticas"""
+
+    total_prestamos = len(prestamos)
+    prestamos_pendientes = sum(1 for p in prestamos if p.estado == 'Pendiente')
+    prestamos_devueltos = sum(1 for p in prestamos if p.estado == 'Devuelto')
+
+    prestamos_por_usuario = {}
+    for p in prestamos:
+        nombre_usuario = p.usuario.perfil.nombre
+        if nombre_usuario in prestamos_por_usuario:
+            prestamos_por_usuario[nombre_usuario] += 1
+        else:
+            prestamos_por_usuario[nombre_usuario] = 1
+    
+    prestamos_por_categoria = {}
+    for p in prestamos:
+        categoria = p.libro.categoria.nombre if p.libro.categoria else 'Sin categoría'
+        if categoria in prestamos_por_categoria:
+            prestamos_por_categoria[categoria] += 1
+        else:
+            prestamos_por_categoria[categoria] = 1
+    
+    datos_resumen = [
+        ['Total Préstamos', total_prestamos],
+        ['Préstamos Pendientes', prestamos_pendientes],
+        ['Préstamos Devueltos', prestamos_devueltos],
+        ['Porcentaje Devolución', f"{(prestamos_devueltos/total_prestamos*100):.1f}%" if total_prestamos > 0 else "0%"],
+        ['Período', f"{fecha_inicio or 'Inicio'} a {fecha_fin or 'Actualidad'}"]
+    ]
+    
+    df_resumen = pd.DataFrame(datos_resumen, columns=['Métrica', 'Valor'])
+    
+    df_usuarios = pd.DataFrame(
+        sorted(prestamos_por_usuario.items(), key=lambda x: x[1], reverse=True),
+        columns=['Usuario', 'Cantidad Préstamos']
+    )
+    
+    df_categorias = pd.DataFrame(
+        sorted(prestamos_por_categoria.items(), key=lambda x: x[1], reverse=True),
+        columns=['Categoría', 'Cantidad Préstamos']
+    )
+    
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df_resumen.to_excel(writer, index=False, sheet_name='Resumen General')
+        df_usuarios.to_excel(writer, index=False, sheet_name='Préstamos por Usuario')
+        df_categorias.to_excel(writer, index=False, sheet_name='Préstamos por Categoría')
+    
+    output.seek(0)
+    
+    fecha_actual = datetime.now().strftime('%Y%m%d_%H%M%S')
+    return send_file(
+        output,
+        download_name=f"Resumen_Prestamos_{fecha_actual}.xlsx",
+        as_attachment=True,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+def generar_reporte_vencidos(prestamos):
+    
+    fecha_actual = datetime.now()
+    prestamos_vencidos = []
+    
+    for p in prestamos:
+        if p.estado == 'Pendiente':
+            dias_prestamo = (fecha_actual - p.fecha_prestamo).days
+            if dias_prestamo > 15:  # Consideramos vencido después de 15 días
+                prestamos_vencidos.append({
+                    'ID Préstamo': p.id,
+                    'Usuario': p.usuario.perfil.nombre,
+                    'C.I.': p.usuario.perfil.C_I,
+                    'Celular': p.usuario.perfil.celular or 'Sin registro',
+                    'Libro': p.libro.titulo,
+                    'Fecha Préstamo': p.fecha_prestamo.strftime('%d/%m/%Y'),
+                    'Días de retraso': dias_prestamo - 15,
+                    'Días totales': dias_prestamo
+                })
+    
+    if prestamos_vencidos:
+        df = pd.DataFrame(prestamos_vencidos)
+
+        df = df.sort_values('Días de retraso', ascending=False)
+        
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Préstamos Vencidos')
+
+            resumen = pd.DataFrame([
+                ['Total préstamos vencidos', len(prestamos_vencidos)],
+                ['Fecha de generación', datetime.now().strftime('%d/%m/%Y %H:%M')]
+            ], columns=['Descripción', 'Valor'])
+            resumen.to_excel(writer, index=False, sheet_name='Resumen')
+        
+        output.seek(0)
+        return send_file(
+            output,
+            download_name=f"Prestamos_Vencidos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+            as_attachment=True,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    else:
+        flash('No hay préstamos vencidos', 'info')
+        return redirect(url_for('auth.reportes_prestamos'))

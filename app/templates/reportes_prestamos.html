@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}Reportes de Préstamos{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-file-earmark-bar-graph"></i> Reportes de Préstamos</h2>
+        <a href="{{ url_for('auth.lista_prestamos') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Volver a Préstamos
+        </a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-funnel"></i> Generar Reporte</h5>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('auth.exportar_reporte_prestamos') }}" method="POST">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="fecha_inicio" class="form-label">Fecha Inicio</label>
+                                <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="fecha_fin" class="form-label">Fecha Fin</label>
+                                <input type="date" class="form-control" id="fecha_fin" name="fecha_fin">
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="estado" class="form-label">Estado del Préstamo</label>
+                                <select class="form-select" id="estado" name="estado">
+                                    <option value="todos">Todos los estados</option>
+                                    <option value="Pendiente">Pendientes</option>
+                                    <option value="Devuelto">Devueltos</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="tipo_reporte" class="form-label">Tipo de Reporte</label>
+                                <select class="form-select" id="tipo_reporte" name="tipo_reporte">
+                                    <option value="completo">Reporte Completo (Detallado)</option>
+                                    <option value="resumen">Reporte Resumen (Estadísticas)</option>
+                                    <option value="vencidos">Préstamos Vencidos (+15 días)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> 
+                            <strong>Información:</strong> Los reportes se generarán en formato Excel con múltiples hojas.
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-file-earmark-excel"></i> Generar Reporte Excel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
