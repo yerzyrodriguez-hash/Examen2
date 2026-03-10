@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash
-from flask_login import login_user, logout_user, login_required
+from flask_login import login_user, logout_user, login_required, current_user
 from .models import User, Lector, Libro, Categoria, Prestamo
 from .extensions import db, login_manager
+from .inventario import solo_admin
 from datetime import datetime
 
 auth_bp = Blueprint('auth', __name__)
@@ -11,6 +12,7 @@ def load_user(user_id):
 
 @auth_bp.route('/registro', methods=['GET', 'POST'])
 @login_required
+@solo_admin
 def registro():
     if request.method == 'POST':
         username = request.form.get('username')
@@ -58,6 +60,8 @@ def logout():
 @auth_bp.route('/usuarios')
 @login_required
 def lista_usuarios():
+    if current_user.role != 'admin':
+        return redirect(url_for('inventario.catalogo'))
     busqueda = request.args.get('busqueda', '')
     if busqueda:
         usuarios = User.query.join(Lector).filter(
@@ -68,6 +72,24 @@ def lista_usuarios():
     else:
         usuarios = User.query.all()
     return render_template('lista_usuarios.html', usuarios=usuarios, busqueda=busqueda)
+
+@auth_bp.route('/editar/<int:id>', methods=['GET', 'POST'])
+@login_required
+def editar_usuario(id):
+    usuario = User.query.get_or_404(id)
+    if request.method == 'POST':
+        usuario.username = request.form.get('username')
+        usuario.role = request.form.get('rol')
+        usuario.perfil.nombre = request.form.get('nombre')
+        usuario.perfil.C_I = request.form.get('c_i')
+        usuario.perfil.celular = request.form.get('celular')
+        nueva_password = request.form.get('password')
+        if nueva_password:
+            usuario.set_password(nueva_password)
+        db.session.commit()
+        flash(f'Datos del usuario "{usuario.username}" actualizados correctamente.', 'success')
+        return redirect(url_for('auth.lista_usuarios'))
+    return render_template('editar_usuario.html', usuario=usuario)
 
 @auth_bp.route('/eliminar/<int:id>')
 @login_required
@@ -85,6 +107,7 @@ def eliminar_usuario(id):
 # ============= RUTAS PARA PRÉSTAMOS =============
 @auth_bp.route('/prestamos')
 @login_required
+@solo_admin
 def lista_prestamos():
     estado = request.args.get('estado')
     
@@ -97,6 +120,7 @@ def lista_prestamos():
 
 @auth_bp.route('/prestamo/nuevo', methods=['GET', 'POST'])
 @login_required
+@solo_admin
 def nuevo_prestamo():
     if request.method == 'POST':
         usuario_id = request.form.get('usuario_id')
@@ -138,6 +162,7 @@ def nuevo_prestamo():
 
 @auth_bp.route('/prestamo/devolver/<int:id>')
 @login_required
+@solo_admin
 def devolver_prestamo(id):
     prestamo = Prestamo.query.get_or_404(id)
     

@@ -1,27 +1,8 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <title>Categorías - Biblioteca</title>
-</head>
-<body class="bg-light">
+{% extends 'base.html' %}
 
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-        <div class="container">
-            <a class="navbar-brand fw-bold" href="#">📚 Panel de Biblioteca</a>
-            <div class="d-flex align-items-center gap-2">
-                <a href="{{ url_for('inventario.catalogo') }}" class="btn btn-outline-light btn-sm">📖 Catálogo</a>
-                {% if current_user.role == 'admin' %}
-                    <a href="{{ url_for('inventario.lista_categorias') }}" class="btn btn-outline-light btn-sm">🗂️ Categorías</a>
-                    <a href="{{ url_for('auth.lista_usuarios') }}" class="btn btn-outline-light btn-sm">👥 Usuarios</a>
-                {% endif %}
-                <span class="navbar-text text-white mx-2">Hola, {{ current_user.perfil.nombre }}</span>
-                <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-danger btn-sm">Cerrar Sesión</a>
-            </div>
-        </div>
-    </nav>
+{% block title %}Préstamos{% endblock %}
+
+{% block content %}
 
 <div class="container mt-5">
     <div class="row justify-content-center">
@@ -112,7 +93,4 @@ document.getElementById('libro_id').addEventListener('change', function() {
 });
 </script>
 
-
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+{% endblock %}
