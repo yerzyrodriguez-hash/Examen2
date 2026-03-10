@@ -43,6 +43,11 @@ class Libro(db.Model):
     stock = db.Column(db.Integer, nullable=False, default=0)
     categoria_id = db.Column(db.Integer, db.ForeignKey('categorias.id'), nullable=False)
     
+    @property
+    def disponible(self):
+        prestamos_pendientes = sum(1 for p in self.prestamos if p.estado == 'Pendiente')
+        return self.stock > prestamos_pendientes
+
     def __repr__(self):
         return f'<Libro {self.titulo}>'
 

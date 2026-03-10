@@ -1,7 +1,8 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_user, logout_user, login_required
-from .models import User, Lector
+from .models import User, Lector, Libro, Categoria, Prestamo
 from .extensions import db, login_manager
+from datetime import datetime
 
 auth_bp = Blueprint('auth', __name__)
 @login_manager.user_loader
@@ -80,3 +81,77 @@ def eliminar_usuario(id):
     db.session.commit()
     flash('El usuario y su perfil han sido eliminados del sistema.', 'success')
     return redirect(url_for('auth.lista_usuarios'))
+
+# ============= RUTAS PARA PRÉSTAMOS =============
+@auth_bp.route('/prestamos')
+@login_required
+def lista_prestamos():
+    estado = request.args.get('estado')
+    
+    if estado:
+        prestamos = Prestamo.query.filter_by(estado=estado).all()
+    else:
+        prestamos = Prestamo.query.all()
+    
+    return render_template('prestamos.html', prestamos=prestamos)
+
+@auth_bp.route('/prestamo/nuevo', methods=['GET', 'POST'])
+@login_required
+def nuevo_prestamo():
+    if request.method == 'POST':
+        usuario_id = request.form.get('usuario_id')
+        libro_id = request.form.get('libro_id')
+
+        if not usuario_id or not libro_id:
+            flash('Debe seleccionar un usuario y un libro', 'danger')
+            return redirect(url_for('auth.nuevo_prestamo'))
+
+        libro = Libro.query.get(libro_id)
+
+        prestamos_pendientes = Prestamo.query.filter_by(
+            libro_id=libro_id, 
+            estado='Pendiente'
+        ).count()
+        
+        if prestamos_pendientes >= libro.stock:
+            flash(f'No hay ejemplares disponibles de "{libro.titulo}"', 'danger')
+            return redirect(url_for('auth.nuevo_prestamo'))
+        
+        prestamo = Prestamo(
+            usuario_id=usuario_id,
+            libro_id=libro_id
+        )
+        
+        try:
+            db.session.add(prestamo)
+            db.session.commit()
+            flash(f'Préstamo registrado exitosamente', 'success')
+            return redirect(url_for('auth.lista_prestamos'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al registrar préstamo: {str(e)}', 'danger')
+            return redirect(url_for('auth.nuevo_prestamo'))
+    
+    usuarios = User.query.all()
+    libros = Libro.query.all()
+    return render_template('nuevo_prestamo.html', usuarios=usuarios, libros=libros)
+
+@auth_bp.route('/prestamo/devolver/<int:id>')
+@login_required
+def devolver_prestamo(id):
+    prestamo = Prestamo.query.get_or_404(id)
+    
+    if prestamo.estado == 'Pendiente':
+        prestamo.estado = 'Devuelto'
+        prestamo.fecha_devolucion = datetime.now()
+        
+        try:
+            db.session.commit()
+            flash(f'Libro "{prestamo.libro.titulo}" devuelto exitosamente', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al procesar devolución: {str(e)}', 'danger')
+    else:
+        flash('Este préstamo ya fue devuelto anteriormente', 'warning')
+    
+    return redirect(url_for('auth.lista_prestamos'))
