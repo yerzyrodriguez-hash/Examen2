@@ -2,6 +2,9 @@ from flask import Blueprint, render_template, redirect, url_for, request, flash
 from flask_login import login_user, logout_user, login_required
 from .models import User, Lector
 from .extensions import db, login_manager
+import pandas as pd
+from io import BytesIO
+from flask import send_file
 
 auth_bp = Blueprint('auth', __name__)
 @login_manager.user_loader
@@ -67,3 +70,32 @@ def lista_usuarios():
     else:
         usuarios = User.query.all()
     return render_template('lista_usuarios.html', usuarios=usuarios, busqueda=busqueda)
+
+@auth_bp.route('/exportar_usuarios')
+@login_required
+def exportar_usuarios():
+    usuarios = User.query.all()
+    datos = []
+    for u in usuarios:
+        datos.append({
+            'C.I.': u.perfil.C_I,
+            'Nombre Completo': u.perfil.nombre,
+            'Nombre de Usuario': u.username,
+            'Celular': u.perfil.celular or 'Sin registro',
+            'Rol en Sistema': 'Administrador' if u.role == 'admin' else 'Lector'
+        })
+    df = pd.DataFrame(datos)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Lista de Usuarios')
+        worksheet = writer.sheets['Lista de Usuarios']
+        for col in worksheet.columns:
+            max_length = max(len(str(cell.value)) for cell in col)
+            worksheet.column_dimensions[col[0].column_letter].width = max_length + 2
+    output.seek(0)
+    return send_file(
+        output,
+        download_name="Reporte_Usuarios_Biblioteca.xlsx",
+        as_attachment=True,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
