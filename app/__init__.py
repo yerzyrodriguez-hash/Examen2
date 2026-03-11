@@ -18,6 +18,9 @@ def create_app():
     from .auth import auth_bp
     app.register_blueprint(auth_bp)
     
+    from .chatbot import chatbot_bp
+    app.register_blueprint(chatbot_bp)
+    
     from .inventario import inventario_bp
     app.register_blueprint(inventario_bp)
     
