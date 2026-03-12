@@ -464,3 +464,79 @@ def generar_reporte_vencidos(prestamos):
     else:
         flash('No hay préstamos vencidos', 'info')
         return redirect(url_for('auth.reportes_prestamos'))
+    
+###########################DASHBOARD################################
+
+@auth_bp.route('/dashboard')
+@login_required
+def dashboard():
+    
+    # Estadísticas generales
+    total_libros = Libro.query.count()
+    total_usuarios = User.query.count()
+    prestamos_activos = Prestamo.query.filter_by(estado='Pendiente').count()
+    prestamos_devueltos = Prestamo.query.filter_by(estado='Devuelto').count()
+    
+    # Libros por categoría (para gráfico de pastel)
+    categorias = Categoria.query.all()
+    categorias_nombres = [c.nombre for c in categorias]
+    libros_por_categoria = [len(c.libros) for c in categorias]
+    
+    # Préstamos por mes (últimos 6 meses)
+    from datetime import datetime, timedelta
+    import calendar
+    
+    meses = []
+    prestamos_por_mes = []
+    
+    for i in range(5, -1, -1):
+        fecha = datetime.now() - timedelta(days=30*i)
+        mes_nombre = calendar.month_name[fecha.month][:3] + f" {fecha.year}"
+        meses.append(mes_nombre)
+        
+        inicio_mes = datetime(fecha.year, fecha.month, 1)
+        if fecha.month == 12:
+            fin_mes = datetime(fecha.year + 1, 1, 1) - timedelta(days=1)
+        else:
+            fin_mes = datetime(fecha.year, fecha.month + 1, 1) - timedelta(days=1)
+        
+        cantidad = Prestamo.query.filter(
+            Prestamo.fecha_prestamo >= inicio_mes,
+            Prestamo.fecha_prestamo <= fin_mes
+        ).count()
+        prestamos_por_mes.append(cantidad)
+    
+    # Top 5 libros más prestados
+    from sqlalchemy import func
+    top_libros = db.session.query(
+        Libro.titulo,
+        func.count(Prestamo.id).label('total_prestamos')
+    ).join(Prestamo).group_by(Libro.id).order_by(func.count(Prestamo.id).desc()).limit(5).all()
+    
+    top_libros_nombres = [l[0] for l in top_libros]
+    top_libros_cantidad = [l[1] for l in top_libros]
+    
+    # Usuarios con más préstamos
+    top_usuarios = db.session.query(
+        Lector.nombre,
+        func.count(Prestamo.id).label('total_prestamos')
+    ).join(User, Lector.usuario_id == User.id).join(Prestamo, User.id == Prestamo.usuario_id).group_by(Lector.id).order_by(func.count(Prestamo.id).desc()).limit(5).all()
+    
+    top_usuarios_nombres = [u[0] for u in top_usuarios]
+    top_usuarios_cantidad = [u[1] for u in top_usuarios]
+    
+    return render_template(
+        'dashboard.html',
+        total_libros=total_libros,
+        total_usuarios=total_usuarios,
+        prestamos_activos=prestamos_activos,
+        prestamos_devueltos=prestamos_devueltos,
+        categorias_nombres=categorias_nombres,
+        libros_por_categoria=libros_por_categoria,
+        meses=meses,
+        prestamos_por_mes=prestamos_por_mes,
+        top_libros_nombres=top_libros_nombres,
+        top_libros_cantidad=top_libros_cantidad,
+        top_usuarios_nombres=top_usuarios_nombres,
+        top_usuarios_cantidad=top_usuarios_cantidad
+    )

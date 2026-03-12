@@ -62,6 +62,12 @@
                             <i class="bi bi-bookshelf"></i> Catalogo
                         </a>
                     </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('auth.dashboard') }}">
+                            <i class="bi bi-bar-chart-line"></i> Dashboard
+                        </a>
+                    </li>
                 </ul>
                 
                 {% if current_user.is_authenticated %}
